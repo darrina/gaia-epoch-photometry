@@ -172,10 +172,9 @@ def download_file(url: str) -> str:
             with tempfile.NamedTemporaryFile(delete=False, suffix=".csv.gz") as fh:
                 temp_path = fh.name
                 for chunk in resp.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
-                    if not chunk:
-                        continue
-                    fh.write(chunk)
-                    total_bytes += len(chunk)
+                    if chunk:
+                        fh.write(chunk)
+                        total_bytes += len(chunk)
             logger.info("  Downloaded %.1f MB", total_bytes / 1_048_576)
             return temp_path
         except requests.RequestException as exc:

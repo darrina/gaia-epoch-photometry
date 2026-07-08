@@ -18,6 +18,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
+import process_gaia
 
 from process_gaia import (
     DOWNLOAD_CHUNK_SIZE,
@@ -284,6 +285,47 @@ class TestDownloadFile:
                 assert fh.read() == b"abcdefghi"
         finally:
             os.remove(temp_path)
+
+    def test_removes_temp_file_on_streaming_error(self, monkeypatch, tmp_path):
+        temp_path = tmp_path / "download.csv.gz"
+
+        class FakeTempFile:
+            def __init__(self, path):
+                self.name = str(path)
+                self._fh = None
+
+            def __enter__(self):
+                self._fh = open(self.name, "wb")
+                return self
+
+            def write(self, data):
+                return self._fh.write(data)
+
+            def __exit__(self, exc_type, exc, tb):
+                self._fh.close()
+
+        class MockResponse:
+            def raise_for_status(self):
+                return None
+
+            def iter_content(self, chunk_size):
+                assert chunk_size == DOWNLOAD_CHUNK_SIZE
+                yield b"abc"
+                raise process_gaia.requests.RequestException("stream interrupted")
+
+        monkeypatch.setattr(
+            "process_gaia.requests.get",
+            lambda *args, **kwargs: MockResponse(),
+        )
+        monkeypatch.setattr(
+            "process_gaia.tempfile.NamedTemporaryFile",
+            lambda *args, **kwargs: FakeTempFile(temp_path),
+        )
+
+        with pytest.raises(process_gaia.requests.RequestException):
+            download_file("https://example.com/test.csv.gz")
+
+        assert not temp_path.exists()
 
 
 class TestProcessFileData:
