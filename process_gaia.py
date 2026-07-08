@@ -26,8 +26,8 @@ Comments / feedback on the challenge:
   - The Gaia epoch photometry files are large gzip-compressed CSVs where each
     row holds a single source and the flux measurements are stored as
     space-separated arrays inside a single CSV cell (e.g., "1.23 4.56 7.89").
-  - Python with numpy makes the min/max computation over variable-length arrays
-    very clean and efficient.
+  - Python (without heavy scientific dependencies) makes the min/max computation over
+    variable-length arrays very clean and efficient.
   - A streaming approach (row-by-row parsing) is used so that even very large
     files can be processed without loading everything into RAM at once.
   - Writing code in Python as recommended by the bonus criteria was
