@@ -316,12 +316,13 @@ def iter_csv_rows(data: Union[bytes, BinaryIO]) -> Generator[Dict[str, str], Non
 
 def process_file_data(data: Union[bytes, BinaryIO], filename: str) -> Generator[Dict, None, None]:
     """
-    Process the contents of a single epoch photometry CSV.gz file from raw
-    bytes or a binary file object.
+    Process the contents of a single epoch photometry CSV.gz file and yield
+    qualifying rows.
 
-    When passing a file object, it must be opened in binary mode and positioned
-    at the start of the gzip-compressed data.
-    Yields result dicts for qualifying sources.
+    `data` may be raw gzip-compressed bytes or a binary file object positioned
+    at the start of the gzip stream. Passing a binary file object preserves
+    end-to-end streaming; raw bytes remain supported for tests and other
+    in-memory callers.
     """
     row_count = 0
     match_count = 0
