@@ -25,7 +25,6 @@ from process_gaia import (
     process_row,
     iter_csv_rows,
     process_file_data,
-    THRESHOLD,
 )
 
 
