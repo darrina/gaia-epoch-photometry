@@ -345,7 +345,7 @@ class TestDownloadFile:
             lambda *args, **kwargs: FakeTempFile(temp_path),
         )
 
-        with pytest.raises(process_gaia.requests.RequestException):
+        with pytest.raises(process_gaia.requests.RequestException, match="stream interrupted"):
             download_file("https://example.com/test.csv.gz")
 
         assert not temp_path.exists()
@@ -359,12 +359,11 @@ class TestDownloadFile:
             "process_gaia.requests.get",
             lambda *args, **kwargs: MockResponse(),
         )
-        monkeypatch.setattr(
-            "process_gaia.tempfile.NamedTemporaryFile",
-            lambda *args, **kwargs: (_ for _ in ()).throw(
-                AssertionError("temp file should not be created on HTTP error")
-            ),
-        )
+
+        def fail_named_tempfile(*args, **kwargs):
+            raise AssertionError("temp file should not be created on HTTP error")
+
+        monkeypatch.setattr("process_gaia.tempfile.NamedTemporaryFile", fail_named_tempfile)
 
         with pytest.raises(process_gaia.requests.HTTPError):
             download_file("https://example.com/test.csv.gz")

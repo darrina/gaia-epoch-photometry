@@ -303,6 +303,7 @@ def iter_csv_rows(data: Union[bytes, BinaryIO]) -> Generator[Dict[str, str], Non
     as dicts.
     """
     if isinstance(data, bytes):
+        # Wrap in-memory gzip bytes in a file-like object for gzip.open().
         source = io.BytesIO(data)
     else:
         source = data
