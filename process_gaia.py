@@ -133,8 +133,9 @@ def fetch_file_listing() -> List[str]:
         if key_el is None or not key_el.text:
             continue
         key = key_el.text
-        # Accept only CSV gzip files
-        if key.endswith(".csv.gz"):
+        # Accept only epoch photometry CSV gzip files
+        filename = key.rsplit("/", 1)[-1]
+        if filename.startswith("EpochPhotometry_") and filename.endswith(".csv.gz"):
             files.append(key)
 
     files.sort()
