@@ -43,7 +43,7 @@ Python **3.8 +** required (uses `f-strings`, `typing` generics, and `argparse` f
 pip install -r requirements.txt
 ```
 
-Dependencies are minimal — only the standard `requests` library is needed (plus `pytest` for tests).
+Dependencies are minimal — only the third-party `requests` library is needed (plus `pytest` for tests).
 
 ---
 
