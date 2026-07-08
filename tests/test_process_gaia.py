@@ -286,6 +286,29 @@ class TestDownloadFile:
         finally:
             os.remove(temp_path)
 
+    def test_skips_empty_chunks_when_streaming(self, monkeypatch):
+        chunks = [b"abc", b"", b"def"]
+
+        class MockResponse:
+            def raise_for_status(self):
+                return None
+
+            def iter_content(self, chunk_size):
+                assert chunk_size == DOWNLOAD_CHUNK_SIZE
+                yield from chunks
+
+        monkeypatch.setattr(
+            "process_gaia.requests.get",
+            lambda *args, **kwargs: MockResponse(),
+        )
+
+        temp_path = download_file("https://example.com/test.csv.gz")
+        try:
+            with open(temp_path, "rb") as fh:
+                assert fh.read() == b"abcdef"
+        finally:
+            os.remove(temp_path)
+
     def test_removes_temp_file_on_streaming_error(self, monkeypatch, tmp_path):
         temp_path = tmp_path / "download.csv.gz"
 
@@ -326,6 +349,25 @@ class TestDownloadFile:
             download_file("https://example.com/test.csv.gz")
 
         assert not temp_path.exists()
+
+    def test_removes_temp_file_on_http_error(self, monkeypatch):
+        class MockResponse:
+            def raise_for_status(self):
+                raise process_gaia.requests.HTTPError("bad response")
+
+        monkeypatch.setattr(
+            "process_gaia.requests.get",
+            lambda *args, **kwargs: MockResponse(),
+        )
+        monkeypatch.setattr(
+            "process_gaia.tempfile.NamedTemporaryFile",
+            lambda *args, **kwargs: (_ for _ in ()).throw(
+                AssertionError("temp file should not be created on HTTP error")
+            ),
+        )
+
+        with pytest.raises(process_gaia.requests.HTTPError):
+            download_file("https://example.com/test.csv.gz")
 
 
 class TestProcessFileData:

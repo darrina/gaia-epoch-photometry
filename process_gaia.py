@@ -160,7 +160,8 @@ def download_file(url: str) -> str:
     """
     Download a file with retries, streaming it to a temporary file.
 
-    Returns the temporary file path. The caller is responsible for removing it.
+    Returns the temporary file path. The caller is responsible for removing it,
+    including if downstream processing later fails after this function returns.
     """
     for attempt in range(1, MAX_RETRIES + 1):
         temp_path: Optional[str] = None
