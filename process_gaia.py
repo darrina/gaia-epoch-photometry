@@ -314,16 +314,15 @@ def iter_csv_rows(data: Union[bytes, BinaryIO]) -> Generator[Dict[str, str], Non
             yield row
 
 
-def process_file_data(data: Union[bytes, BinaryIO], filename: str) -> List[Dict]:
+def process_file_data(data: Union[bytes, BinaryIO], filename: str) -> Generator[Dict, None, None]:
     """
     Process the contents of a single epoch photometry CSV.gz file from raw
     bytes or a binary file object.
 
     When passing a file object, it must be opened in binary mode and positioned
     at the start of the gzip-compressed data.
-    Returns a list of result dicts for qualifying sources.
+    Yields result dicts for qualifying sources.
     """
-    results: List[Dict] = []
     row_count = 0
     match_count = 0
 
@@ -331,14 +330,13 @@ def process_file_data(data: Union[bytes, BinaryIO], filename: str) -> List[Dict]
         row_count += 1
         result = process_row(row)
         if result is not None:
-            results.append(result)
             match_count += 1
+            yield result
 
     logger.info(
         "  %s: %d sources processed, %d with >%.0f%% variability",
         filename, row_count, match_count, THRESHOLD,
     )
-    return results
 
 
 # ---------------------------------------------------------------------------
@@ -375,50 +373,50 @@ def main(args: argparse.Namespace) -> None:
     output_path = args.output
     data_dir = args.data_dir
 
-    all_results: List[Dict] = []
+    total_results = 0
     t_start = time.time()
 
     # ---- Determine source of files ----------------------------------------
     local_files = find_local_files(data_dir) if data_dir else []
 
-    if local_files:
-        logger.info("Using %d local file(s) from '%s'.", len(local_files), data_dir)
-        for path in local_files:
-            fname = os.path.basename(path)
-            logger.info("Processing local file: %s", fname)
-            with open(path, "rb") as fh:
-                data = fh.read()
-            results = process_file_data(data, fname)
-            all_results.extend(results)
-
-    else:
-        # Download from Gaia CDN
-        logger.info("No local files found. Downloading from Gaia CDN.")
-        urls = fetch_file_listing()
-
-        for i, url in enumerate(urls, start=1):
-            fname = url.rsplit("/", 1)[-1]
-            logger.info("--- File %d/%d: %s ---", i, len(urls), fname)
-            temp_path = download_file(url)
-            try:
-                with open(temp_path, "rb") as fh:
-                    results = process_file_data(fh, fname)
-                all_results.extend(results)
-            finally:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-
     # ---- Write output -------------------------------------------------------
-    logger.info("Writing %d results to '%s'.", len(all_results), output_path)
+    logger.info("Writing results to '%s'.", output_path)
     with open(output_path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=OUTPUT_FIELDS)
         writer.writeheader()
-        writer.writerows(all_results)
+
+        if local_files:
+            logger.info("Using %d local file(s) from '%s'.", len(local_files), data_dir)
+            for path in local_files:
+                fname = os.path.basename(path)
+                logger.info("Processing local file: %s", fname)
+                with open(path, "rb") as source:
+                    for result in process_file_data(source, fname):
+                        writer.writerow(result)
+                        total_results += 1
+
+        else:
+            # Download from Gaia CDN
+            logger.info("No local files found. Downloading from Gaia CDN.")
+            urls = fetch_file_listing()
+
+            for i, url in enumerate(urls, start=1):
+                fname = url.rsplit("/", 1)[-1]
+                logger.info("--- File %d/%d: %s ---", i, len(urls), fname)
+                temp_path = download_file(url)
+                try:
+                    with open(temp_path, "rb") as source:
+                        for result in process_file_data(source, fname):
+                            writer.writerow(result)
+                            total_results += 1
+                finally:
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
 
     elapsed = time.time() - t_start
     logger.info(
         "Done. %d qualifying sources written to '%s' in %.1f s.",
-        len(all_results), output_path, elapsed,
+        total_results, output_path, elapsed,
     )
 
 

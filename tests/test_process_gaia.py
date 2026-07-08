@@ -375,7 +375,7 @@ class TestProcessFileData:
             [{"source_id": "1", "bp_flux": "1.0 1.5", "rp_flux": ""}],
             ["source_id", "bp_flux", "rp_flux"],
         )
-        results = process_file_data(gz, "test.csv.gz")
+        results = list(process_file_data(gz, "test.csv.gz"))
         assert results == []
 
     def test_one_qualifying_source(self):
@@ -383,7 +383,7 @@ class TestProcessFileData:
             [{"source_id": "42", "bp_flux": "1.0 5.0", "rp_flux": ""}],
             ["source_id", "bp_flux", "rp_flux"],
         )
-        results = process_file_data(gz, "test.csv.gz")
+        results = list(process_file_data(gz, "test.csv.gz"))
         assert len(results) == 1
         assert results[0]["source_id"] == "42"
         assert math.isclose(results[0]["percentage_change"], 400.0)
@@ -395,6 +395,6 @@ class TestProcessFileData:
             {"source_id": "3", "bp_flux": "", "rp_flux": "2.0 2.5"},    # <100%
         ]
         gz = _make_csv_gz(rows, ["source_id", "bp_flux", "rp_flux"])
-        results = process_file_data(gz, "test.csv.gz")
+        results = list(process_file_data(gz, "test.csv.gz"))
         assert len(results) == 1
         assert results[0]["source_id"] == "2"
