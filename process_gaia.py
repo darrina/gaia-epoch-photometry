@@ -302,7 +302,6 @@ def iter_csv_rows(data: Union[bytes, BinaryIO]) -> Generator[Dict[str, str], Non
     Decompress a gzip-compressed CSV bytes object or binary file and yield rows
     as dicts.
     """
-    source: Union[io.BytesIO, BinaryIO]
     if isinstance(data, bytes):
         source = io.BytesIO(data)
     else:

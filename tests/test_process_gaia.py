@@ -259,7 +259,7 @@ class TestIterCsvRows:
 
 class TestDownloadFile:
     def test_streams_response_to_temp_file(self, monkeypatch):
-        chunks = [b"abc", b"def", b"ghi"]
+        chunks = [b"abc", b"", b"def", b"ghi"]
 
         class MockResponse:
             def raise_for_status(self):
@@ -281,7 +281,7 @@ class TestDownloadFile:
         temp_path = download_file("https://example.com/test.csv.gz")
         try:
             with open(temp_path, "rb") as fh:
-                assert fh.read() == b"".join(chunks)
+                assert fh.read() == b"abcdefghi"
         finally:
             os.remove(temp_path)
 
