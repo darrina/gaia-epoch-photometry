@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 
 from process_gaia import (
+    DOWNLOAD_CHUNK_SIZE,
     parse_flux_array,
     band_stats,
     download_file,
@@ -265,7 +266,7 @@ class TestDownloadFile:
                 return None
 
             def iter_content(self, chunk_size):
-                assert chunk_size == 1024 * 1024
+                assert chunk_size == DOWNLOAD_CHUNK_SIZE
                 yield from chunks
 
             @property

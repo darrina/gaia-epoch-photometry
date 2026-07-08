@@ -80,6 +80,7 @@ OUTPUT_FIELDS = [
 REQUEST_TIMEOUT = 300  # seconds per download
 MAX_RETRIES = 3
 RETRY_DELAY = 5  # seconds between retries
+DOWNLOAD_CHUNK_SIZE = 1024 * 1024  # 1 MiB
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -166,7 +167,7 @@ def download_file(url: str) -> str:
             total_bytes = 0
             with tempfile.NamedTemporaryFile(delete=False, suffix=".csv.gz") as fh:
                 temp_path = fh.name
-                for chunk in resp.iter_content(chunk_size=1024 * 1024):
+                for chunk in resp.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
                     if not chunk:
                         continue
                     fh.write(chunk)
@@ -311,7 +312,8 @@ def iter_csv_rows(data: Union[bytes, BinaryIO]) -> Generator[Dict[str, str], Non
 
 def process_file_data(data: Union[bytes, BinaryIO], filename: str) -> List[Dict]:
     """
-    Process the contents of a single epoch photometry CSV.gz file.
+    Process the contents of a single epoch photometry CSV.gz file from raw
+    bytes or a binary file object.
     Returns a list of result dicts for qualifying sources.
     """
     results: List[Dict] = []
