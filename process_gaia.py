@@ -157,7 +157,11 @@ def fetch_file_listing() -> List[str]:
 
 
 def download_file(url: str) -> str:
-    """Download a file with retries, streaming it to a temporary file."""
+    """
+    Download a file with retries, streaming it to a temporary file.
+
+    Returns the temporary file path. The caller is responsible for removing it.
+    """
     for attempt in range(1, MAX_RETRIES + 1):
         temp_path: Optional[str] = None
         try:
@@ -314,6 +318,9 @@ def process_file_data(data: Union[bytes, BinaryIO], filename: str) -> List[Dict]
     """
     Process the contents of a single epoch photometry CSV.gz file from raw
     bytes or a binary file object.
+
+    When passing a file object, it must be opened in binary mode and positioned
+    at the start of the gzip-compressed data.
     Returns a list of result dicts for qualifying sources.
     """
     results: List[Dict] = []
