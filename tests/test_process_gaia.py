@@ -22,6 +22,7 @@ import pytest
 from process_gaia import (
     parse_flux_array,
     band_stats,
+    download_file,
     process_row,
     iter_csv_rows,
     process_file_data,
@@ -239,6 +240,49 @@ class TestIterCsvRows:
         rows = list(iter_csv_rows(gz))
         assert len(rows) == 1
         assert rows[0]["source_id"] == "1"
+
+    def test_accepts_binary_file_object(self, tmp_path):
+        gz = _make_csv_gz(
+            [{"source_id": "1", "bp_flux": "1.0 2.0", "rp_flux": ""}],
+            ["source_id", "bp_flux", "rp_flux"],
+        )
+        path = tmp_path / "test.csv.gz"
+        path.write_bytes(gz)
+
+        with path.open("rb") as fh:
+            rows = list(iter_csv_rows(fh))
+
+        assert len(rows) == 1
+        assert rows[0]["source_id"] == "1"
+
+
+class TestDownloadFile:
+    def test_streams_response_to_temp_file(self, monkeypatch):
+        chunks = [b"abc", b"def", b"ghi"]
+
+        class MockResponse:
+            def raise_for_status(self):
+                return None
+
+            def iter_content(self, chunk_size):
+                assert chunk_size == 1024 * 1024
+                yield from chunks
+
+            @property
+            def content(self):
+                raise AssertionError("download_file should not access resp.content")
+
+        monkeypatch.setattr(
+            "process_gaia.requests.get",
+            lambda *args, **kwargs: MockResponse(),
+        )
+
+        temp_path = download_file("https://example.com/test.csv.gz")
+        try:
+            with open(temp_path, "rb") as fh:
+                assert fh.read() == b"".join(chunks)
+        finally:
+            os.remove(temp_path)
 
 
 class TestProcessFileData:

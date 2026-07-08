@@ -43,9 +43,10 @@ import math
 import os
 import re
 import sys
+import tempfile
 import time
 import xml.etree.ElementTree as ET
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import BinaryIO, Dict, Generator, List, Optional, Tuple, Union
 
 import requests
 
@@ -154,17 +155,27 @@ def fetch_file_listing() -> List[str]:
 # ---------------------------------------------------------------------------
 
 
-def download_file(url: str) -> bytes:
-    """Download a file with retries and return its raw bytes."""
+def download_file(url: str) -> str:
+    """Download a file with retries, streaming it to a temporary file."""
     for attempt in range(1, MAX_RETRIES + 1):
+        temp_path: Optional[str] = None
         try:
             logger.info("[%d/%d] Downloading %s", attempt, MAX_RETRIES, url)
             resp = requests.get(url, timeout=REQUEST_TIMEOUT, stream=True)
             resp.raise_for_status()
-            data = resp.content
-            logger.info("  Downloaded %.1f MB", len(data) / 1_048_576)
-            return data
+            total_bytes = 0
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".csv.gz") as fh:
+                temp_path = fh.name
+                for chunk in resp.iter_content(chunk_size=1024 * 1024):
+                    if not chunk:
+                        continue
+                    fh.write(chunk)
+                    total_bytes += len(chunk)
+            logger.info("  Downloaded %.1f MB", total_bytes / 1_048_576)
+            return temp_path
         except requests.RequestException as exc:
+            if temp_path and os.path.exists(temp_path):
+                os.remove(temp_path)
             logger.warning("Download attempt %d failed: %s", attempt, exc)
             if attempt == MAX_RETRIES:
                 raise
@@ -281,17 +292,24 @@ def process_row(row: Dict[str, str]) -> Optional[Dict]:
 # ---------------------------------------------------------------------------
 
 
-def iter_csv_rows(data: bytes) -> Generator[Dict[str, str], None, None]:
+def iter_csv_rows(data: Union[bytes, BinaryIO]) -> Generator[Dict[str, str], None, None]:
     """
-    Decompress a gzip-compressed CSV bytes object and yield rows as dicts.
+    Decompress a gzip-compressed CSV bytes object or binary file and yield rows
+    as dicts.
     """
-    with gzip.open(io.BytesIO(data), "rt", encoding="utf-8", errors="replace") as fh:
+    source: Union[io.BytesIO, BinaryIO]
+    if isinstance(data, bytes):
+        source = io.BytesIO(data)
+    else:
+        source = data
+
+    with gzip.open(source, "rt", encoding="utf-8", errors="replace") as fh:
         reader = csv.DictReader(fh)
         for row in reader:
             yield row
 
 
-def process_file_data(data: bytes, filename: str) -> List[Dict]:
+def process_file_data(data: Union[bytes, BinaryIO], filename: str) -> List[Dict]:
     """
     Process the contents of a single epoch photometry CSV.gz file.
     Returns a list of result dicts for qualifying sources.
@@ -372,10 +390,14 @@ def main(args: argparse.Namespace) -> None:
         for i, url in enumerate(urls, start=1):
             fname = url.rsplit("/", 1)[-1]
             logger.info("--- File %d/%d: %s ---", i, len(urls), fname)
-            data = download_file(url)
-            results = process_file_data(data, fname)
-            all_results.extend(results)
-            del data  # free memory
+            temp_path = download_file(url)
+            try:
+                with open(temp_path, "rb") as fh:
+                    results = process_file_data(fh, fname)
+                all_results.extend(results)
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
 
     # ---- Write output -------------------------------------------------------
     logger.info("Writing %d results to '%s'.", len(all_results), output_path)
