@@ -1,0 +1,7 @@
+[project]
+name = "gaia-eppoch-photometry"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.28.0",
+]

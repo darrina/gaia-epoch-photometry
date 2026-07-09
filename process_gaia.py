@@ -57,6 +57,7 @@ import requests
 # Gaia DR3 epoch photometry CDN base URL
 CDN_BASE = "https://cdn.gea.esac.esa.int"
 CDN_LIST_URL = f"{CDN_BASE}/?prefix=Gaia/gdr3/Photometry/epoch_photometry/"
+STORAGE_LIST_URL = "https://gaia.eu-1.cdn77-storage.com/?prefix=Gaia/gdr3/Photometry/epoch_photometry/&delimiter=/"
 
 # Number of files to process (as specified in the challenge benchmark)
 NUM_FILES = 20
@@ -101,16 +102,16 @@ logger = logging.getLogger(__name__)
 
 def fetch_file_listing() -> List[str]:
     """
-    Query the Gaia CDN (Google Cloud Storage bucket) for the list of epoch
-    photometry CSV files and return them sorted alphabetically.
+    Query the Gaia storage backend for the list of epoch photometry CSV files
+    and return them sorted alphabetically.
 
     Returns a list of full download URLs for the first NUM_FILES files.
     """
-    logger.info("Fetching file listing from %s", CDN_LIST_URL)
+    logger.info("Fetching file listing from %s", STORAGE_LIST_URL)
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            resp = requests.get(CDN_LIST_URL, timeout=60)
+            resp = requests.get(STORAGE_LIST_URL, timeout=60)
             resp.raise_for_status()
             break
         except requests.RequestException as exc:
@@ -118,6 +119,10 @@ def fetch_file_listing() -> List[str]:
             if attempt == MAX_RETRIES:
                 raise
             time.sleep(RETRY_DELAY)
+
+    if not resp:
+        raise RuntimeError("Failed to fetch file listing from Gaia CDN")
+        
 
     # Parse S3-compatible XML listing
     try:
